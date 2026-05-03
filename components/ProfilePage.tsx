@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useLanyard, getAvatarUrl, STATUS_COLORS, STATUS_LABELS } from "@/hooks/useLanyard";
+import CustomCursor from "@/components/CustomCursor";
 
 export interface SocialLink {
   label: string;
@@ -14,15 +16,16 @@ export interface SocialLink {
 export interface ProfileConfig {
   slug: string;
   username: string;
-  tagline: string;
+  tagline?: string;
+  location?: string;
   avatarUrl: string;
+  discordId: string;
   videoUrl?: string;
   musicUrl?: string;
   accentColor: string;
   socials: SocialLink[];
 }
 
-// SVG icons
 const icons = {
   tiktok: (
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -30,9 +33,8 @@ const icons = {
     </svg>
   ),
   roblox: (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-      <path d="M2.982 17.549l3.469-13.098 13.099 3.467-3.468 13.099-13.1-3.468zm5.322-6.617l-.74 2.794 2.793.739.74-2.793-2.793-.74z" />
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/media/roblox.png" alt="Roblox" width={20} height={20} style={{ display: "block", objectFit: "contain", filter: "brightness(0) invert(1)" }} />
   ),
   discord: (
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -61,16 +63,30 @@ const icons = {
   ),
 };
 
+function VolumeOnIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+    </svg>
+  );
+}
+
+function VolumeOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z" />
+    </svg>
+  );
+}
+
 function CopyableTag({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
-
   const copy = () => {
     navigator.clipboard.writeText(value).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
   };
-
   return (
     <button
       onClick={copy}
@@ -83,17 +99,31 @@ function CopyableTag({ value }: { value: string }) {
 }
 
 export default function ProfilePage({ config }: { config: ProfileConfig }) {
-  const [views, setViews] = useState<number | null>(null);
-  const [muted, setMuted] = useState(true);
-  const [musicOn, setMusicOn] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [views, setViews]           = useState<number | null>(null);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const [musicMuted, setMusicMuted] = useState(false);
+  const [mounted, setMounted]       = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  const { data: lanyard } = useLanyard(config.discordId);
+
+  // Resolved display values
+  const displayName   = lanyard?.discord_user.global_name || lanyard?.discord_user.username || config.username;
+  const displayAvatar = lanyard != null ? getAvatarUrl(lanyard) : config.avatarUrl;
+  const status        = lanyard?.discord_status ?? null;
+  const dotColor      = status != null ? STATUS_COLORS[status] : null;
+  const statusLabel   = status != null ? STATUS_LABELS[status] : null;
+
+  // Read spotify/game directly — don't rely on listening_to_spotify flag
+  const spotify = lanyard?.spotify ?? null;
+  const game    = (spotify == null && lanyard != null)
+    ? (lanyard.activities?.find((a) => a.type === 0) ?? null)
+    : null;
+
+  // Mount: views + music autoplay
   useEffect(() => {
     setMounted(true);
-
-    // Increment view count
     fetch("/api/views", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,116 +134,172 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
       .catch(() => setViews(0));
   }, [config.slug]);
 
-  const toggleMute = () => {
-    setMuted((m) => {
-      if (videoRef.current) videoRef.current.muted = !m;
-      return !m;
-    });
-  };
+  // Autoplay background music; fall back to first user interaction if blocked
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !config.musicUrl) return;
 
-  const toggleMusic = () => {
+    let interacted = false;
+
+    const tryPlay = () => {
+      audio.play().catch(() => {});
+    };
+
+    const onInteract = () => {
+      if (!interacted) {
+        interacted = true;
+        tryPlay();
+      }
+    };
+
+    tryPlay();
+    document.addEventListener("click",      onInteract, { once: true });
+    document.addEventListener("touchstart", onInteract, { once: true });
+
+    return () => {
+      document.removeEventListener("click",      onInteract);
+      document.removeEventListener("touchstart", onInteract);
+    };
+  }, [config.musicUrl]);
+
+  const toggleMusicMute = () => {
     if (!audioRef.current) return;
-    if (musicOn) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(() => {});
-    }
-    setMusicOn((v) => !v);
+    const next = !audioRef.current.muted;
+    audioRef.current.muted = next;
+    setMusicMuted(next);
   };
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-black flex flex-col items-center justify-center">
-      {/* Video background */}
-      {config.videoUrl ? (
+      <CustomCursor />
+
+      {/* Video background — falls back to dark gradient if file missing or load fails */}
+      {config.videoUrl && !videoFailed ? (
         <video
           ref={videoRef}
           src={config.videoUrl}
           autoPlay
           loop
-          muted={muted}
+          muted
           playsInline
+          onError={() => setVideoFailed(true)}
           className="absolute inset-0 w-full h-full object-cover opacity-40"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a]" />
       )}
 
-      {/* Dark overlay */}
       <div className="absolute inset-0 bg-black/50" />
 
-      {/* Gradient accent overlay */}
       <div
         className="absolute inset-0 opacity-20"
-        style={{
-          background: `radial-gradient(ellipse at center, ${config.accentColor}33 0%, transparent 70%)`,
-        }}
+        style={{ background: `radial-gradient(ellipse at center, ${config.accentColor}33 0%, transparent 70%)` }}
       />
 
-      {/* Back link */}
+      {/* Audio element (hidden) */}
+      {config.musicUrl && (
+        <audio ref={audioRef} src={config.musicUrl} loop preload="auto" />
+      )}
+
+      {/* ── Top-left: back link ── */}
       <Link
         href="/"
-        className="absolute top-5 left-5 z-20 text-white/40 hover:text-white/80 text-sm font-mono transition-colors flex items-center gap-2"
+        className="absolute top-5 left-5 z-20 text-white/40 hover:text-white/80 text-sm font-mono transition-colors"
       >
         ← back
       </Link>
 
-      {/* Video mute button */}
-      {config.videoUrl && (
+      {/* ── Bottom-right: music mute button ── */}
+      {config.musicUrl && (
         <button
-          onClick={toggleMute}
-          className="absolute top-5 right-5 z-20 glass rounded-full px-4 py-2 text-xs font-mono text-white/60 hover:text-white transition-all"
+          onClick={toggleMusicMute}
+          title={musicMuted ? "Unmute music" : "Mute music"}
+          className="fixed bottom-6 right-6 z-30 w-11 h-11 rounded-full glass flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all"
         >
-          {muted ? "🔇 unmute video" : "🔊 mute video"}
+          {musicMuted ? <VolumeOffIcon /> : <VolumeOnIcon />}
         </button>
       )}
 
-      {/* Background music */}
-      {config.musicUrl && (
-        <audio ref={audioRef} src={config.musicUrl} loop preload="none" />
-      )}
-
-      {/* Profile card */}
+      {/* ── Profile card ── */}
       <div
         className="relative z-10 flex flex-col items-center gap-6 px-6 py-10 w-full max-w-sm"
         style={{
-          opacity: mounted ? 1 : 0,
-          transform: mounted ? "translateY(0)" : "translateY(20px)",
+          opacity:    mounted ? 1 : 0,
+          transform:  mounted ? "translateY(0)" : "translateY(20px)",
           transition: "opacity 0.6s ease, transform 0.6s ease",
         }}
       >
-        {/* Avatar */}
-        <div
-          className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-white/10 shadow-2xl"
-          style={{ boxShadow: `0 0 40px ${config.accentColor}44` }}
-        >
-          {config.avatarUrl ? (
-            <Image
-              src={config.avatarUrl}
-              alt={config.username}
-              fill
-              className="object-cover"
-              unoptimized
-            />
-          ) : (
-            <div
-              className="w-full h-full flex items-center justify-center text-4xl"
-              style={{ background: `${config.accentColor}22` }}
-            >
-              {config.username[0].toUpperCase()}
-            </div>
+        {/* Avatar + status dot */}
+        <div className="relative">
+          <div
+            className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-white/10 shadow-2xl"
+            style={{ boxShadow: `0 0 40px ${config.accentColor}44` }}
+          >
+            {displayAvatar ? (
+              <Image src={displayAvatar} alt={displayName} fill className="object-cover" unoptimized />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center text-4xl"
+                style={{ background: `${config.accentColor}22` }}
+              >
+                {displayName[0].toUpperCase()}
+              </div>
+            )}
+          </div>
+          {dotColor && (
+            <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-black ${dotColor}`} />
           )}
         </div>
 
-        {/* Name + tagline */}
+        {/* Name + location + status */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-white tracking-tight">{config.username}</h1>
-          <p className="text-white/40 text-sm mt-1 font-mono">{config.tagline}</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">{displayName}</h1>
+
+          {config.location && (
+            <p
+              className="text-xs mt-1.5 tracking-widest font-mono"
+              style={{
+                color: "rgba(186, 230, 253, 0.85)",
+                textShadow: [
+                  "0 0 6px rgba(147, 197, 253, 0.9)",
+                  "0 0 14px rgba(147, 197, 253, 0.5)",
+                  "0 0 28px rgba(147, 197, 253, 0.2)",
+                ].join(", "),
+              }}
+            >
+              📍 {config.location}
+            </p>
+          )}
+
+          {statusLabel && (
+            <p className={`text-xs font-mono mt-1 ${
+              status === "online"  ? "text-green-400/80"  :
+              status === "idle"    ? "text-yellow-400/80" :
+              status === "dnd"     ? "text-red-400/80"    :
+                                     "text-gray-400/60"
+            }`}>
+              ● {statusLabel}
+            </p>
+          )}
         </div>
 
-        {/* Divider */}
         <div className="w-16 h-px bg-white/10" />
 
-        {/* Social links */}
+        {/* ── Game activity (above socials) ── */}
+        {game != null && (
+          <div className="glass flex items-center gap-3 rounded-xl px-4 py-3 w-full">
+            <span className="text-xl shrink-0">🎮</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-white/90 text-sm font-medium truncate">{game.name}</p>
+              {game.details != null && (
+                <p className="text-white/45 text-xs truncate">{game.details}</p>
+              )}
+            </div>
+            <span className="text-white/30 text-xs font-mono shrink-0">playing</span>
+          </div>
+        )}
+
+        {/* ── Social links ── */}
         <div className="flex flex-col gap-2.5 w-full">
           {config.socials.map((s) => (
             <div key={s.label}>
@@ -224,15 +310,15 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
                   rel="noopener noreferrer"
                   className="social-link glass flex items-center gap-3 rounded-xl px-4 py-3 w-full"
                 >
-                  <span className="text-white/60">{icons[s.icon]}</span>
+                  <span className="inline-flex items-center justify-center w-5 h-5 shrink-0 text-white/60">{icons[s.icon]}</span>
                   <span className="text-xs font-mono text-white/40 uppercase tracking-wider w-16 shrink-0">
                     {s.label}
                   </span>
                   <span className="text-sm text-white/80 truncate">{s.value}</span>
                 </a>
               ) : (
-                <div className="glass flex items-center gap-3 rounded-xl px-4 py-3 w-full">
-                  <span className="text-white/60">{icons[s.icon]}</span>
+                <div className="social-link glass flex items-center gap-3 rounded-xl px-4 py-3 w-full">
+                  <span className="inline-flex items-center justify-center w-5 h-5 shrink-0 text-white/60">{icons[s.icon]}</span>
                   <span className="text-xs font-mono text-white/40 uppercase tracking-wider w-16 shrink-0">
                     {s.label}
                   </span>
@@ -243,33 +329,38 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
           ))}
         </div>
 
-        {/* Music toggle */}
-        {config.musicUrl && (
-          <button
-            onClick={toggleMusic}
-            className="glass flex items-center gap-3 rounded-xl px-4 py-3 w-full social-link"
-          >
-            <span className="text-white/60 text-lg">{musicOn ? "🎵" : "🎵"}</span>
-            <span className="text-xs font-mono text-white/40 uppercase tracking-wider w-16 shrink-0">
-              music
-            </span>
-            <span className="text-sm text-white/80">{musicOn ? "playing ▶" : "click to play"}</span>
-            {musicOn && (
-              <span className="ml-auto flex gap-0.5 items-end">
-                {[3, 5, 4, 6, 3].map((h, i) => (
-                  <span
-                    key={i}
-                    className="w-0.5 bg-white/50 rounded-full animate-pulse"
-                    style={{ height: `${h * 2}px`, animationDelay: `${i * 0.1}s` }}
-                  />
-                ))}
-              </span>
-            )}
-          </button>
+        {/* ── Spotify section (below socials) ── */}
+        {spotify != null && (
+          <div className="glass flex items-center gap-3 rounded-xl px-4 py-3 w-full border border-[#1DB954]/20">
+            {/* Album art */}
+            <div className="relative w-12 h-12 rounded-md overflow-hidden shrink-0 border border-white/10">
+              <Image
+                src={spotify.album_art_url}
+                alt={spotify.album}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+
+            {/* Song + artist */}
+            <div className="flex-1 min-w-0">
+              {/* "Listening to Spotify" label */}
+              <div className="flex items-center gap-1.5 mb-0.5">
+                {/* Spotify icon */}
+                <svg viewBox="0 0 24 24" fill="#1DB954" className="w-3 h-3 shrink-0">
+                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+                </svg>
+                <span className="text-[#1DB954] text-xs font-mono">Listening to Spotify</span>
+              </div>
+              <p className="text-white/90 text-sm font-semibold truncate leading-tight">{spotify.song}</p>
+              <p className="text-white/45 text-xs truncate">{spotify.artist}</p>
+            </div>
+          </div>
         )}
 
-        {/* View counter */}
-        <div className="flex items-center gap-2 mt-2">
+        {/* ── View counter ── */}
+        <div className="flex items-center gap-2 mt-1">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
           <span className="text-white/25 text-xs font-mono">
             {views === null ? "loading..." : `${views.toLocaleString()} views`}

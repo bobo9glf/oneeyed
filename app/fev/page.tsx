@@ -1,6 +1,15 @@
 import ProfilePage from "@/components/ProfilePage";
 import type { Metadata } from "next";
 
+/* ===== FEV DISCORD ID - CHANGE THIS ===== */
+const fevDiscordId = "728270929343545434"; // fev's Discord user ID
+/* ========================================== */
+
+/* ===== FEV MEDIA - CHANGE FILES HERE ===== */
+const fevVideo = "/media/fev.mp4"; // drop fev.mp4 in public/media/
+const fevAudio = "/media/fev.mp3"; // drop fev.mp3 in public/media/
+/* ========================================== */
+
 export const metadata: Metadata = {
   title: "fev",
   description: "fev's profile",
@@ -12,21 +21,21 @@ export default function FevPage() {
       config={{
         slug: "fev",
         username: "fev",
-        tagline: "just vibing",
         avatarUrl: "",
-        videoUrl: "",
-        musicUrl: "",
+        discordId: fevDiscordId,
+        videoUrl: fevVideo,
+        musicUrl: fevAudio,
         accentColor: "#06b6d4",
         socials: [
           {
-            label: "TikTok",
-            value: "@fev",
-            href: "https://www.tiktok.com/@fev",
-            icon: "tiktok",
+            label: "Roblox",
+            value: "fev",
+            href: "https://www.roblox.com/users/379485945/profile",
+            icon: "roblox",
           },
           {
             label: "Discord",
-            value: "fev#0000",
+            value: "fev",
             icon: "discord",
           },
         ],
