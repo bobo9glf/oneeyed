@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useLanyard, getAvatarUrl, STATUS_COLORS, STATUS_LABELS } from "@/hooks/useLanyard";
+import { useLanyard, prefetchLanyard, getAvatarUrl, STATUS_COLORS, STATUS_LABELS } from "@/hooks/useLanyard";
 import CustomCursor from "@/components/CustomCursor";
 
 export interface SocialLink {
@@ -100,6 +100,9 @@ function CopyableTag({ value }: { value: string }) {
 }
 
 export default function ProfilePage({ config }: { config: ProfileConfig }) {
+  // Start the Lanyard REST fetch immediately during render, before useEffect fires
+  prefetchLanyard(config.discordId);
+
   const [views, setViews]           = useState<number | null>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [volume, setVolume]         = useState(config.defaultVolume ?? 0.25);
@@ -108,7 +111,7 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const { data: lanyard } = useLanyard(config.discordId);
+  const { data: lanyard, loading: lanyardLoading } = useLanyard(config.discordId);
 
   // Resolved display values
   const displayName   = lanyard?.discord_user.global_name || lanyard?.discord_user.username || config.username;
@@ -282,16 +285,27 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
             className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-white/10 shadow-2xl"
             style={{ boxShadow: `0 0 40px ${config.accentColor}44` }}
           >
-            {displayAvatar ? (
-              <Image src={displayAvatar} alt={displayName} fill className="object-cover" unoptimized />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center text-4xl"
-                style={{ background: `${config.accentColor}22` }}
-              >
-                {displayName[0].toUpperCase()}
-              </div>
-            )}
+            {/* Skeleton — pulses while Lanyard loads, fades out once data arrives */}
+            <div
+              className="absolute inset-0 animate-pulse bg-white/10"
+              style={{
+                opacity: lanyardLoading ? 1 : 0,
+                transition: "opacity 0.5s ease",
+                pointerEvents: "none",
+              }}
+            />
+            {/* Real avatar — fades in once Lanyard data arrives */}
+            <div
+              className="absolute inset-0"
+              style={{
+                opacity: lanyardLoading ? 0 : 1,
+                transition: "opacity 0.5s ease",
+              }}
+            >
+              {displayAvatar && (
+                <Image src={displayAvatar} alt={displayName} fill className="object-cover" unoptimized />
+              )}
+            </div>
           </div>
           {dotColor && (
             <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-black ${dotColor}`} />

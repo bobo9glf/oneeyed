@@ -47,8 +47,26 @@ const OP_HELLO      = 1; // server → client: send heartbeat interval + identif
 const OP_INITIALIZE = 2; // client → server: subscribe to a user
 const OP_HEARTBEAT  = 3; // client → server: keep-alive ping
 
-const WS_URL     = "wss://api.lanyard.rest/socket";
+const WS_URL      = "wss://api.lanyard.rest/socket";
+const REST_URL    = "https://api.lanyard.rest/v1/users";
 const PLACEHOLDER = "PUT_DISCORD_ID_HERE";
+
+// Module-level cache: keyed by Discord ID, stores the in-flight REST promise.
+// Populated by prefetchLanyard() so the fetch starts before useEffect runs.
+const prefetchCache = new Map<string, Promise<LanyardData | null>>();
+
+/** Fire the Lanyard REST fetch immediately (safe to call during render). */
+export function prefetchLanyard(discordId: string): void {
+  if (!discordId || discordId === PLACEHOLDER) return;
+  if (prefetchCache.has(discordId)) return;
+  prefetchCache.set(
+    discordId,
+    fetch(`${REST_URL}/${discordId}`)
+      .then((r) => r.json())
+      .then((json: { data?: LanyardData }) => json.data ?? null)
+      .catch(() => null),
+  );
+}
 
 /** Returns the CDN URL for a user's Discord avatar. size defaults to 256. */
 export function getAvatarUrl(data: LanyardData, size: 128 | 256 | 512 = 256): string {
@@ -93,10 +111,23 @@ export function useLanyard(discordId: string) {
       return;
     }
 
-    let destroyed    = false;
+    let destroyed      = false;
+    let wsDataReceived = false; // prevents stale REST response from overwriting live WS data
     let ws: WebSocket | null = null;
     let heartbeatTimer: ReturnType<typeof setInterval>  | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Reuse an already-started prefetch, or start one now if prefetchLanyard wasn't called
+    const restPromise =
+      prefetchCache.get(discordId) ??
+      (prefetchLanyard(discordId), prefetchCache.get(discordId)!);
+
+    restPromise.then((d) => {
+      if (!destroyed && !wsDataReceived && d) {
+        setData(d);
+        setLoading(false);
+      }
+    });
 
     function cleanup() {
       if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
@@ -144,6 +175,7 @@ export function useLanyard(discordId: string) {
           const presence = msg.d as LanyardData;
           console.log(`[Lanyard WS] spotify:`, presence?.spotify ?? null);
           if (!destroyed) {
+            wsDataReceived = true;
             setData(presence);
             setLoading(false);
           }
