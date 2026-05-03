@@ -36,7 +36,7 @@ export default function FevPage() {
           },
           {
             label: "Discord",
-            value: "fev",
+            value: "fevvex",
             icon: "discord",
           },
         ],

@@ -36,7 +36,7 @@ export default function AyumuPage() {
           },
           {
             label: "Discord",
-            value: "ayumu",
+            value: "6glf",
             icon: "discord",
           },
         ],
