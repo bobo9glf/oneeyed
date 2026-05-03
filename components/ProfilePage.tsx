@@ -126,16 +126,12 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
     ? (lanyard.activities?.find((a) => a.type === 0) ?? null)
     : null;
 
-  // Mount: views + music autoplay
+  // Mount: increment + fetch view count from CounterAPI
   useEffect(() => {
     setMounted(true);
-    fetch("/api/views", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug: config.slug }),
-    })
+    fetch(`https://api.counterapi.dev/v1/oneeyed/${config.slug}/up`)
       .then((r) => r.json())
-      .then((d) => setViews(d.count))
+      .then((d) => setViews(d.count ?? 0))
       .catch(() => setViews(0));
   }, [config.slug]);
 
@@ -422,9 +418,8 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
 
         {/* ── View counter ── */}
         <div className="flex items-center gap-2 mt-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
           <span className="text-white/25 text-xs font-mono">
-            {views === null ? "loading..." : `${views.toLocaleString()} views`}
+            {views === null ? "loading..." : `👁 ${views.toLocaleString()} views`}
           </span>
         </div>
       </div>
