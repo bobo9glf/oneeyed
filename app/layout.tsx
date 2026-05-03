@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "profiles",
-  description: "multi-profile bio site",
+  title: "one eyed kings",
+  description: "oneeyed.tokyo",
 };
 
 export default function RootLayout({
@@ -24,6 +24,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <head>
+        <meta property="og:title" content="one eyed kings" />
+        <meta property="og:description" content="oneeyed.tokyo" />
+        <meta property="og:image" content="/media/homepage.mp4" />
+        <meta property="og:url" content="https://oneeyed.tokyo" />
+        <meta name="theme-color" content="#000000" />
+      </head>
       <body className="min-h-screen bg-[#0a0a0a]">{children}</body>
     </html>
   );
