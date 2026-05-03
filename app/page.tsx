@@ -109,6 +109,30 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Typewriter animation for the browser tab title
+  useEffect(() => {
+    const text = "one eyed kings";
+    let i = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    function step() {
+      i++;
+      document.title = text.slice(0, i);
+      if (i >= text.length) {
+        // Full text shown — wait 2s then restart
+        timer = setTimeout(() => {
+          i = 0;
+          timer = setTimeout(step, 150);
+        }, 2000);
+      } else {
+        timer = setTimeout(step, 150);
+      }
+    }
+
+    timer = setTimeout(step, 150);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     setMounted(true);
 
