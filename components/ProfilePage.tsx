@@ -23,6 +23,7 @@ export interface ProfileConfig {
   videoUrl?: string;
   musicUrl?: string;
   accentColor: string;
+  defaultVolume?: number;
   socials: SocialLink[];
 }
 
@@ -101,7 +102,8 @@ function CopyableTag({ value }: { value: string }) {
 export default function ProfilePage({ config }: { config: ProfileConfig }) {
   const [views, setViews]           = useState<number | null>(null);
   const [videoFailed, setVideoFailed] = useState(false);
-  const [musicMuted, setMusicMuted] = useState(false);
+  const [volume, setVolume]         = useState(config.defaultVolume ?? 0.25);
+  const [showSlider, setShowSlider] = useState(false);
   const [mounted, setMounted]       = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -139,6 +141,8 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
     const audio = audioRef.current;
     if (!audio || !config.musicUrl) return;
 
+    audio.volume = config.defaultVolume ?? 0.25;
+
     let interacted = false;
 
     const tryPlay = () => {
@@ -160,13 +164,12 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
       document.removeEventListener("click",      onInteract);
       document.removeEventListener("touchstart", onInteract);
     };
-  }, [config.musicUrl]);
+  }, [config.musicUrl, config.defaultVolume]);
 
-  const toggleMusicMute = () => {
-    if (!audioRef.current) return;
-    const next = !audioRef.current.muted;
-    audioRef.current.muted = next;
-    setMusicMuted(next);
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value) / 100;
+    setVolume(v);
+    if (audioRef.current) audioRef.current.volume = v;
   };
 
   return (
@@ -209,15 +212,59 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
         ← back
       </Link>
 
-      {/* ── Bottom-right: music mute button ── */}
+      {/* ── Bottom-right: volume slider ── */}
       {config.musicUrl && (
-        <button
-          onClick={toggleMusicMute}
-          title={musicMuted ? "Unmute music" : "Mute music"}
-          className="fixed bottom-6 right-6 z-30 w-11 h-11 rounded-full glass flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all"
+        <div
+          className="fixed bottom-6 right-6 z-30 flex flex-col items-center gap-2"
+          onMouseEnter={() => setShowSlider(true)}
+          onMouseLeave={() => setShowSlider(false)}
         >
-          {musicMuted ? <VolumeOffIcon /> : <VolumeOnIcon />}
-        </button>
+          {/* Slider panel */}
+          <div
+            className="flex flex-col items-center gap-2 glass rounded-xl px-3 py-3"
+            style={{
+              opacity: showSlider ? 1 : 0,
+              transform: showSlider ? "translateY(0)" : "translateY(6px)",
+              transition: "opacity 0.2s ease, transform 0.2s ease",
+              pointerEvents: showSlider ? "auto" : "none",
+            }}
+          >
+            <span className="text-white/60 text-xs font-mono w-8 text-center">
+              {Math.round(volume * 100)}%
+            </span>
+            <div style={{ height: 88, width: 20, position: "relative" }}>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(volume * 100)}
+                onChange={handleVolumeChange}
+                style={{
+                  position: "absolute",
+                  width: 88,
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%) rotate(-90deg)",
+                  cursor: "pointer",
+                  accentColor: config.accentColor,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Speaker icon */}
+          <button
+            title={volume === 0 ? "Unmute" : "Mute"}
+            onClick={() => {
+              const next = volume === 0 ? (config.defaultVolume ?? 0.25) : 0;
+              setVolume(next);
+              if (audioRef.current) audioRef.current.volume = next;
+            }}
+            className="w-11 h-11 rounded-full glass flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all"
+          >
+            {volume === 0 ? <VolumeOffIcon /> : <VolumeOnIcon />}
+          </button>
+        </div>
       )}
 
       {/* ── Profile card ── */}
