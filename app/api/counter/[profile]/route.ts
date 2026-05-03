@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: { profile: string } },
+  request: NextRequest,
+  { params }: { params: Promise<{ profile: string }> },
 ) {
-  const { profile } = params;
+  const { profile } = await params;
   const res = await fetch(
     `https://api.counterapi.dev/v1/oneeyed/${profile}/up`,
     { cache: "no-store" },
