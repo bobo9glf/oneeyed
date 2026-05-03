@@ -24,6 +24,7 @@ export interface ProfileConfig {
   musicUrl?: string;
   accentColor: string;
   defaultVolume?: number;
+  viewOffset?: number;
   socials: SocialLink[];
 }
 
@@ -129,9 +130,9 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
   // Mount: increment + fetch view count from CounterAPI
   useEffect(() => {
     setMounted(true);
-    fetch(`https://api.counterapi.dev/v1/oneeyed/${config.slug}/up`)
+    fetch(`/api/counter/${config.slug}`)
       .then((r) => r.json())
-      .then((d) => setViews(d.count ?? 0))
+      .then((d) => setViews((d.count ?? 0) + (config.viewOffset ?? 0)))
       .catch(() => setViews(0));
   }, [config.slug]);
 

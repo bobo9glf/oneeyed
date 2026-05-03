@@ -28,6 +28,7 @@ export default function BoboPage() {
         musicUrl: boboAudio,
         accentColor: "#a855f7",
         defaultVolume: 0.5,
+        viewOffset: 1837,
         socials: [
           {
             label: "TikTok",

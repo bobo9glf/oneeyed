@@ -26,6 +26,7 @@ export default function FevPage() {
         videoUrl: fevVideo,
         musicUrl: fevAudio,
         accentColor: "#06b6d4",
+        viewOffset: 420,
         socials: [
           {
             label: "Roblox",

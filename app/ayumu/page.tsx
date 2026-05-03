@@ -26,6 +26,7 @@ export default function AyumuPage() {
         videoUrl: ayumuVideo,
         musicUrl: ayumuAudio,
         accentColor: "#ec4899",
+        viewOffset: 690,
         socials: [
           {
             label: "Roblox",
