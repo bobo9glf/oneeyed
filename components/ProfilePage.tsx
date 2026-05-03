@@ -109,6 +109,7 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
   const [volume, setVolume]         = useState(config.defaultVolume ?? 0.25);
   const [showSlider, setShowSlider] = useState(false);
   const [mounted, setMounted]       = useState(false);
+  const [entered, setEntered]       = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -136,35 +137,19 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
       .catch(() => setViews(0));
   }, [config.slug]);
 
-  // Autoplay background music; fall back to first user interaction if blocked
+  // Set initial audio volume — music starts on user entry via the splash screen
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !config.musicUrl) return;
-
     audio.volume = config.defaultVolume ?? 0.25;
-
-    let interacted = false;
-
-    const tryPlay = () => {
-      audio.play().catch(() => {});
-    };
-
-    const onInteract = () => {
-      if (!interacted) {
-        interacted = true;
-        tryPlay();
-      }
-    };
-
-    tryPlay();
-    document.addEventListener("click",      onInteract, { once: true });
-    document.addEventListener("touchstart", onInteract, { once: true });
-
-    return () => {
-      document.removeEventListener("click",      onInteract);
-      document.removeEventListener("touchstart", onInteract);
-    };
   }, [config.musicUrl, config.defaultVolume]);
+
+  const handleEnter = () => {
+    setEntered(true);
+    if (audioRef.current && config.musicUrl) {
+      audioRef.current.play().catch(() => {});
+    }
+  };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value) / 100;
@@ -175,6 +160,30 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-black flex flex-col items-center justify-center">
       <CustomCursor />
+
+      {/* Splash screen — fades in on load, fades out on click, then starts music */}
+      <div
+        onClick={handleEnter}
+        className="fixed inset-0 z-50 flex items-center justify-center cursor-pointer"
+        style={{
+          background:             "rgba(0,0,0,0.88)",
+          opacity:                entered ? 0 : mounted ? 1 : 0,
+          transition:             entered
+            ? "opacity 0.8s ease"
+            : "opacity 0.5s ease",
+          pointerEvents:          entered ? "none" : "auto",
+        }}
+      >
+        <p
+          className="text-white/60 text-sm font-mono tracking-widest uppercase"
+          style={{
+            transform: mounted && !entered ? "translateY(0)" : "translateY(6px)",
+            transition: "transform 0.5s ease",
+          }}
+        >
+          click to enter...
+        </p>
+      </div>
 
       {/* Video background — falls back to dark gradient if file missing or load fails */}
       {config.videoUrl && !videoFailed ? (
