@@ -195,13 +195,13 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
           muted
           playsInline
           onError={() => setVideoFailed(true)}
-          className="absolute inset-0 w-full h-full object-cover opacity-40"
+          className="absolute inset-0 w-full h-full object-cover opacity-70"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a]" />
       )}
 
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-black/15" />
 
       <div
         className="absolute inset-0 opacity-20"
