@@ -105,9 +105,33 @@ function ProfilePanel({
   );
 }
 
+function VolumeOnIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+    </svg>
+  );
+}
+
+function VolumeOffIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <line x1="23" y1="9" x2="17" y2="15" />
+      <line x1="17" y1="9" x2="23" y2="15" />
+    </svg>
+  );
+}
+
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted]     = useState(false);
+  const [entered, setEntered]     = useState(false);
+  const [volume, setVolume]       = useState(0.4);
+  const [showSlider, setShowSlider] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioRef  = useRef<HTMLAudioElement>(null);
 
   // Typewriter animation for the browser tab title
   useEffect(() => {
@@ -182,8 +206,108 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleEnter = () => {
+    setEntered(true);
+    audioRef.current?.play().catch(() => {});
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value) / 100;
+    setVolume(v);
+    if (audioRef.current) audioRef.current.volume = v;
+  };
+
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-black">
+
+      {/* ── Audio ── */}
+      <audio ref={audioRef} src="/media/homepage.mp3" loop preload="auto" />
+
+      {/* ── Splash screen ── */}
+      <div
+        onClick={handleEnter}
+        className="fixed inset-0 z-50 flex items-center justify-center cursor-pointer"
+        style={{
+          background:    "rgba(0,0,0,0.88)",
+          opacity:       entered ? 0 : mounted ? 1 : 0,
+          transition:    entered ? "opacity 0.8s ease" : "opacity 0.5s ease",
+          pointerEvents: entered ? "none" : "auto",
+        }}
+      >
+        <p
+          className="text-white/60 text-sm font-mono tracking-widest uppercase"
+          style={{
+            transform:  mounted && !entered ? "translateY(0)" : "translateY(6px)",
+            transition: "transform 0.5s ease",
+          }}
+        >
+          click to enter...
+        </p>
+      </div>
+
+      {/* ── Volume control ── */}
+      <div
+        className="fixed bottom-6 right-6 z-30 flex flex-col items-center gap-2"
+        style={{ opacity: entered ? 1 : 0, transition: "opacity 0.5s ease", pointerEvents: entered ? "auto" : "none" }}
+        onMouseEnter={() => setShowSlider(true)}
+        onMouseLeave={() => setShowSlider(false)}
+      >
+        <div
+          className="flex flex-col items-center gap-2 rounded-xl px-3 py-3"
+          style={{
+            background:    "rgba(255,255,255,0.07)",
+            border:        "1px solid rgba(255,255,255,0.12)",
+            backdropFilter: "blur(12px)",
+            opacity:       showSlider ? 1 : 0,
+            transform:     showSlider ? "translateY(0)" : "translateY(6px)",
+            transition:    "opacity 0.2s ease, transform 0.2s ease",
+            pointerEvents: showSlider ? "auto" : "none",
+          }}
+        >
+          <span className="text-white/60 text-xs font-mono w-8 text-center">
+            {Math.round(volume * 100)}%
+          </span>
+          <div style={{ height: 88, width: 20, position: "relative" }}>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(volume * 100)}
+              onChange={handleVolumeChange}
+              style={{
+                position:  "absolute",
+                width:     88,
+                top:       "50%",
+                left:      "50%",
+                transform: "translate(-50%, -50%) rotate(-90deg)",
+                cursor:    "pointer",
+                accentColor: "#ffffff",
+              }}
+            />
+          </div>
+        </div>
+        <button
+          title={volume === 0 ? "Unmute" : "Mute"}
+          onClick={() => {
+            const next = volume === 0 ? 0.4 : 0;
+            setVolume(next);
+            if (audioRef.current) audioRef.current.volume = next;
+          }}
+          className="w-11 h-11 rounded-full flex items-center justify-center text-white/50 hover:text-white transition-all"
+          style={{
+            background:    "rgba(255,255,255,0.07)",
+            border:        "1px solid rgba(255,255,255,0.12)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          {volume === 0 ? <VolumeOffIcon /> : <VolumeOnIcon />}
+        </button>
+      </div>
 
       {/* ── Video background ── */}
       <video
