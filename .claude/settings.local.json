@@ -3,7 +3,9 @@
     "allow": [
       "PowerShell(New-Item *)",
       "Bash(git *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "PowerShell(Test-Path \"C:\\\\Users\\\\bobo\\\\Desktop\\\\oneeyed\"; \\(Get-ChildItem \"C:\\\\Users\\\\bobo\\\\Desktop\\\\oneeyed\"\\).Count)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\bobo\\\\Desktop\\\\oneeyed\" | ForEach-Object { $_.FullName })"
     ]
   }
 }
