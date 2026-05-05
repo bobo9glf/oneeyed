@@ -146,8 +146,15 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
 
   const handleEnter = () => {
     setEntered(true);
-    if (audioRef.current && config.musicUrl) {
-      audioRef.current.play().catch(() => {});
+    const audio = audioRef.current;
+    const video = videoRef.current;
+    if (audio && config.musicUrl) {
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+    if (video) {
+      video.currentTime = 0;
+      video.play().catch(() => {});
     }
   };
 
@@ -190,7 +197,6 @@ export default function ProfilePage({ config }: { config: ProfileConfig }) {
         <video
           ref={videoRef}
           src={config.videoUrl}
-          autoPlay
           loop
           muted
           playsInline
