@@ -6,7 +6,7 @@ const fevDiscordId = "728270929343545434"; // fev's Discord user ID
 /* ========================================== */
 
 /* ===== FEV MEDIA - CHANGE FILES HERE ===== */
-const fevVideo = "/media/fev.mp4"; // drop fev.mp4 in public/media/
+const fevVideo = "/media/fev.mp4?v=2"; // drop fev.mp4 in public/media/
 const fevAudio = "/media/fev.mp3"; // drop fev.mp3 in public/media/
 /* ========================================== */
 
