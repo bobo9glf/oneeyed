@@ -1,3 +1,4 @@
+import Script from 'next/script'
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -30,7 +31,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-<body className="min-h-screen bg-[#0a0a0a]">{children}</body>
+      <body className="min-h-screen bg-[#0a0a0a]">
+        {children}
+        <Script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="1d67d028-fb1e-48ce-8752-3c0552434710"
+          strategy="afterInteractive"
+        />
+      </body>
     </html>
   );
 }
